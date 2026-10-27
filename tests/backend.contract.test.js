@@ -14,6 +14,7 @@ async function createHarness(overrides = {}) {
   const dataDir = await mkdtemp(path.join(tmpdir(), 'nixsearch-test-'));
   const config = buildConfig({
     NODE_ENV: 'test',
+    SEARCH_SOURCE: 'local',
     DATA_DIR: dataDir,
     HOST: '127.0.0.1',
     PORT: '0',

@@ -3,7 +3,7 @@ import { createRequestLogger } from './api/middleware/requestLogger.js';
 import { createErrorHandler, notFoundHandler } from './api/middleware/errorHandler.js';
 import { createCors } from './api/middleware/cors.js';
 import { createHealthRoutes } from './api/routes/health.routes.js';
-import { createSearchRoutes } from './api/routes/search.routes.js';
+import { createSearchRoutes, createSuggestRoutes } from './api/routes/search.routes.js';
 import { createCrawlRoutes } from './api/routes/crawl.routes.js';
 
 /** Compose the HTTP application separately from the listening server. */
@@ -24,6 +24,7 @@ export function createApp({ services }) {
   // Health remains unauthenticated and is not subject to endpoint rate limits.
   app.use('/api', createHealthRoutes({ services }));
   app.use('/api/search', createSearchRoutes({ services }));
+  app.use('/api/suggest', createSuggestRoutes({ services }));
   app.use('/api/crawl', createCrawlRoutes({ services }));
 
   app.use(notFoundHandler);

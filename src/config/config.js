@@ -238,6 +238,7 @@ export function buildConfig(env = process.env, { throwOnError = true } = {}) {
     },
 
     search: {
+      source: read.string('SEARCH_SOURCE', 'wikipedia', { allow: ['wikipedia', 'local'] }),
       defaultLimit: read.int('SEARCH_DEFAULT_LIMIT', 10, { min: 1, max: 200 }),
       maxLimit: read.int('SEARCH_MAX_LIMIT', 50, { min: 1, max: 500 }),
       maxQueryLength: read.int('SEARCH_MAX_QUERY_LENGTH', 512, { min: 8, max: 10_000 }),
@@ -250,6 +251,13 @@ export function buildConfig(env = process.env, { throwOnError = true } = {}) {
       stemming: read.bool('STEMMING', true),
       stopWords: read.bool('STOP_WORDS', true),
       extraStopWords: read.list('STOP_WORDS_EXTRA', []),
+    },
+
+    wikipedia: {
+      requestTimeoutMs: read.int('WIKIPEDIA_REQUEST_TIMEOUT_MS', 3500, { min: 100, max: 4000 }),
+      cacheTtlMs: read.int('WIKIPEDIA_CACHE_TTL_MS', 300_000, { min: 0, max: 3_600_000 }),
+      maxCachedArticles: read.int('WIKIPEDIA_MAX_CACHED_ARTICLES', 250, { min: 8, max: 5000 }),
+      maxConcurrentSearches: read.int('WIKIPEDIA_MAX_CONCURRENT_SEARCHES', 4, { min: 1, max: 16 }),
     },
 
     log: {
@@ -314,6 +322,7 @@ export function describeConfig(config) {
   return {
     env: config.env,
     port: config.port,
+    searchSource: config.search.source,
     dataDir: path.relative(ROOT_DIR, config.paths.data) || '.',
     bm25: `k1=${config.bm25.k1} b=${config.bm25.b}`,
     crawler: `concurrency=${config.crawler.concurrency} maxPages=${config.crawler.maxPages} maxDepth=${config.crawler.maxDepth}`,

@@ -15,11 +15,11 @@ import { badRequest } from '../../utils/errors.js';
 /** Absurdly long query strings are rejected before any work is done. */
 const HARD_QUERY_LIMIT = 8192;
 
-export function createSearchController({ searchEngine, config, logger }) {
+export function createSearchController({ searchEngine, wikipediaSearch, config, logger }) {
   const log = logger.child({ module: 'search-api' });
 
   /** GET /api/search */
-  function search(request, response) {
+  async function search(request, response) {
     const raw = firstValue(request.query.q ?? request.query.query, 'q');
 
     if (raw === undefined) {
@@ -38,7 +38,7 @@ export function createSearchController({ searchEngine, config, logger }) {
 
     let result;
     try {
-      result = searchEngine.search(raw, { page, limit, host, explain });
+      result = await searchEngine.search(raw, { page, limit, host, explain });
     } catch (error) {
       // Count it in the engine's own telemetry, then let the error middleware
       // shape the response.
@@ -56,7 +56,21 @@ export function createSearchController({ searchEngine, config, logger }) {
     }
   }
 
-  return { search };
+  /** GET /api/suggest (the existing UI remains unchanged). */
+  async function suggest(request, response) {
+    const raw = firstValue(request.query.q, 'q') ?? '';
+    if (raw.length > config.search.maxQueryLength) {
+      throw badRequest(`query is too long (limit ${config.search.maxQueryLength} characters)`);
+    }
+    const prefix = raw.trim();
+    const suggestions = config.search.source === 'wikipedia' && prefix.length >= 2
+      ? await wikipediaSearch.suggest(prefix, 8)
+      : [];
+    response.set('Cache-Control', 'no-store');
+    response.json({ prefix, suggestions });
+  }
+
+  return { search, suggest };
 }
 
 /* -------------------------------------------------------------------------- */

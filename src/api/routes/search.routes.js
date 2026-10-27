@@ -8,8 +8,8 @@ import { createRateLimiter } from '../middleware/rateLimit.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 
 export function createSearchRoutes({ services }) {
-  const { config, logger, searchEngine } = services;
-  const controller = createSearchController({ searchEngine, config, logger });
+  const { config, logger, searchEngine, wikipediaSearch } = services;
+  const controller = createSearchController({ searchEngine, wikipediaSearch, config, logger });
 
   const limiter = createRateLimiter({
     windowMs: config.api.rateLimitWindowMs,
@@ -25,3 +25,18 @@ export function createSearchRoutes({ services }) {
 }
 
 export default createSearchRoutes;
+
+export function createSuggestRoutes({ services }) {
+  const { config, logger, searchEngine, wikipediaSearch } = services;
+  const controller = createSearchController({ searchEngine, wikipediaSearch, config, logger });
+  const limiter = createRateLimiter({
+    windowMs: config.api.rateLimitWindowMs,
+    max: config.api.searchRateLimit,
+    name: 'suggestions',
+    logger,
+  });
+  const router = Router();
+  router.get('/', limiter, asyncHandler(controller.suggest));
+  router.limiter = limiter;
+  return router;
+}

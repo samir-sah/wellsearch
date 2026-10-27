@@ -15,11 +15,15 @@ import { logger as defaultLogger } from './utils/logger.js';
 import { IndexManager } from './index/indexManager.js';
 import { SearchEngine } from './search/searchEngine.js';
 import { CrawlManager } from './crawler/crawlManager.js';
+import { Fetcher } from './crawler/fetcher.js';
+import { WikipediaClient } from './wikipedia/client.js';
+import { WikipediaSearchService } from './wikipedia/searchService.js';
 
 export async function createServices({
   config = defaultConfig,
   logger = defaultLogger,
   fetchImpl,
+  wikipediaClient,
   load = true,
 } = {}) {
   const startedAt = Date.now();
@@ -29,7 +33,7 @@ export async function createServices({
 
   // The *same* analyzer instance indexes and searches: one stop-word list, one
   // stemmer cache, so a query can never be tokenised differently to a document.
-  const searchEngine = new SearchEngine({
+  const localSearchEngine = new SearchEngine({
     indexManager,
     config,
     logger,
@@ -37,12 +41,22 @@ export async function createServices({
   });
 
   const crawlManager = new CrawlManager({ config, logger, indexManager, fetchImpl });
+  const wikipediaSearch = new WikipediaSearchService({
+    config,
+    client: wikipediaClient ?? new WikipediaClient({
+      config,
+      fetcher: new Fetcher({ config, logger, fetchImpl }),
+    }),
+  });
+  const searchEngine = config.search.source === 'local' ? localSearchEngine : wikipediaSearch;
 
   return {
     config,
     logger,
     indexManager,
     searchEngine,
+    localSearchEngine,
+    wikipediaSearch,
     crawlManager,
     startedAt,
     load: loadResult,
@@ -62,6 +76,7 @@ export async function createServices({
         },
         index,
         search: searchEngine.stats(),
+        wikipedia: wikipediaSearch.stats(),
         crawler: crawlManager.status(),
         memory: memoryUsage(),
         config: publicConfig(config),
@@ -70,6 +85,7 @@ export async function createServices({
     },
 
     async close() {
+      await wikipediaSearch.close();
       crawlManager.crawler.stop('shutdown');
       await crawlManager.wait(5_000);
       await indexManager.close();
@@ -112,12 +128,14 @@ export function publicConfig(config) {
       minDocumentLength: config.index.minDocumentLength,
     },
     search: {
+      source: config.search.source,
       defaultLimit: config.search.defaultLimit,
       maxLimit: config.search.maxLimit,
       maxQueryLength: config.search.maxQueryLength,
       snippetLength: config.search.snippetLength,
       phraseBoost: config.search.phraseBoost,
     },
+    wikipedia: { ...config.wikipedia },
     crawler: {
       concurrency: config.crawler.concurrency,
       maxPages: config.crawler.maxPages,

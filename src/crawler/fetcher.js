@@ -52,16 +52,39 @@ export class Fetcher {
    * Fetch a document.
    *
    * @param {string} url
-   * @param {{ acceptAnyType?: boolean, timeoutMs?: number }} [options]
+   * @param {{ acceptAnyType?: boolean, timeoutMs?: number, allowedOrigin?: string }} [options]
    * @returns {Promise<object>} never rejects
    */
-  async fetch(url, { acceptAnyType = false, timeoutMs = this.timeoutMs } = {}) {
+  async fetch(url, { acceptAnyType = false, timeoutMs = this.timeoutMs, allowedOrigin } = {}) {
     const startedAt = performance.now();
     const redirects = [];
     let current = url;
 
     for (let hop = 0; hop <= this.maxRedirects; hop += 1) {
-      const attempt = await this.#once(current, { timeoutMs, acceptAnyType });
+      // A source-specific client may restrict even public redirects to one
+      // origin. Check before resolving or connecting to the next destination.
+      if (allowedOrigin) {
+        let permitted = false;
+        try {
+          const target = new URL(current);
+          permitted = target.origin === allowedOrigin && !target.username && !target.password;
+        } catch { /* invalid targets fail closed */ }
+        if (!permitted) return {
+          ok: false, url: current, requestedUrl: url, status: 0,
+          errorType: 'blocked-origin', error: 'redirect left the permitted source origin',
+          retryable: false, redirects, redirectCount: redirects.length,
+          durationMs: round(performance.now() - startedAt),
+        };
+      }
+      // Wikipedia has two sequential stages, so its timeout bounds the whole
+      // redirect chain rather than starting a fresh budget on every hop.
+      const remaining = allowedOrigin ? timeoutMs - (performance.now() - startedAt) : timeoutMs;
+      if (remaining <= 0) return {
+        ok: false, url: current, requestedUrl: url, status: 0,
+        errorType: 'timeout', error: 'request timed out', retryable: true,
+        redirects, redirectCount: redirects.length, durationMs: round(performance.now() - startedAt),
+      };
+      const attempt = await this.#once(current, { timeoutMs: Math.max(1, remaining), acceptAnyType });
 
       if (attempt.redirectTo) {
         redirects.push({ from: current, to: attempt.redirectTo, status: attempt.status });
@@ -94,11 +117,23 @@ export class Fetcher {
 
   async #once(url, { timeoutMs, acceptAnyType }) {
     this.requests += 1;
-    const target = await checkCrawlTarget(url, {
-      allowPrivateNetwork: this.allowPrivateNetwork,
-      lookup: this.lookup,
-    });
+    // DNS must fit inside the same budget as headers/body; otherwise a slow
+    // resolver could keep an interactive search alive past the client timeout.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new Error('request timed out')), timeoutMs);
+    let target;
+    try {
+      target = await untilAborted(checkCrawlTarget(url, {
+        allowPrivateNetwork: this.allowPrivateNetwork,
+        lookup: this.lookup,
+      }), controller.signal);
+    } catch (error) {
+      clearTimeout(timer);
+      return { ok: false, url, status: 0, errorType: classifyError(error, controller.signal),
+        error: describeError(error), retryable: true };
+    }
     if (!target.allowed) {
+      clearTimeout(timer);
       return {
         ok: false,
         url,
@@ -110,9 +145,6 @@ export class Fetcher {
         retryable: false,
       };
     }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(new Error('request timed out')), timeoutMs);
 
     let response;
     try {
@@ -289,11 +321,20 @@ function requestAddress(url, { address, family, signal, headers }) {
         if (Array.isArray(value)) value.forEach((item) => responseHeaders.append(key, item));
         else if (value !== undefined) responseHeaders.set(key, value);
       }
-      resolve(new Response(Readable.toWeb(incoming), {
-        status: incoming.statusCode,
-        statusText: incoming.statusMessage,
-        headers: responseHeaders,
-      }));
+      try {
+        // Response forbids bodies on these statuses. Passing the stream would
+        // throw from this event callback, outside the fetcher's error handling.
+        const noBody = [204, 205, 304].includes(incoming.statusCode);
+        if (noBody) incoming.resume();
+        resolve(new Response(noBody ? null : Readable.toWeb(incoming), {
+          status: incoming.statusCode,
+          statusText: incoming.statusMessage,
+          headers: responseHeaders,
+        }));
+      } catch (error) {
+        incoming.destroy();
+        reject(error);
+      }
     });
     request.once('error', reject);
     request.end();
@@ -408,3 +449,12 @@ function round(value) {
 
 export { RETRYABLE_ERRORS, RETRYABLE_STATUSES };
 export default Fetcher;
+
+function untilAborted(task, signal) {
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason ?? new Error('request timed out'));
+    signal.addEventListener('abort', abort, { once: true });
+    Promise.resolve(task).then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+    if (signal.aborted) abort();
+  });
+}

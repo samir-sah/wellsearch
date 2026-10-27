@@ -111,6 +111,7 @@ test('local crawl API fetches, parses, deduplicates, indexes, searches, and surv
   const config = buildConfig({
     NODE_ENV: 'test',
     ALLOW_PRIVATE_NETWORK: 'true',
+    SEARCH_SOURCE: 'local',
     DATA_DIR: dataDir,
     PERSIST_INTERVAL_MS: '0',
     CRAWL_DELAY_MS: '0',
