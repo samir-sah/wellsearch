@@ -1,6 +1,8 @@
-# NixSearch
+# WellSearch
 
-NixSearch searches English Wikipedia in real time while keeping its existing Next.js interface. Its default search pipeline adapts the article discovery, extraction, tokenization, and BM25 approach from the supplied `Wikipedia_Search_Engine-main` codebase. The original crawler and persistent local index remain available through `SEARCH_SOURCE=local`.
+WellSearch searches English Wikipedia in real time through a responsive Next.js interface. Its default search pipeline adapts the article discovery, extraction, tokenization, and BM25 approach from the supplied `Wikipedia_Search_Engine-main` codebase. The original crawler and persistent local index remain available through `SEARCH_SOURCE=local`.
+
+Source repository: [samir-sah/wellsearch](https://github.com/samir-sah/wellsearch).
 
 ## Features
 
@@ -10,7 +12,8 @@ NixSearch searches English Wikipedia in real time while keeping its existing Nex
 - SSRF-resistant fetching: local, private, link-local, metadata, mapped IPv4, and special IPv6 destinations are blocked; redirects are revalidated and sockets are pinned to validated DNS answers.
 - Stemming, stop-word handling, snippets, highlighting, and pagination; the local index also supports quoted phrases, exclusions, and host filters.
 - Atomic JSON persistence for the local index with recovery from missing, corrupt, or torn snapshots.
-- A responsive Next.js interface with keyboard-friendly search, loading/error/no-result states, and safe external result links.
+- A white-dominant Next.js interface with royal green accents, translucent glass surfaces, matte controls, Montserrat typography, and hover/focus feedback that respects reduced-motion preferences.
+- Keyboard-friendly search, loading/error/no-result states, and safe external result links.
 - Restricted exact-origin CORS, request/body limits, admin authentication for crawl writes, rate limiting, structured logging, and graceful shutdown.
 
 ## Architecture
@@ -33,7 +36,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and [docs/WIKIPE
 
 ## How search works
 
-With the default `SEARCH_SOURCE=wikipedia`, a search first discovers article titles through the English Wikipedia OpenSearch API. Up to eight articles are fetched in parallel, cleaned of navigation and other page furniture, and ranked using BM25. Title terms receive a 3× weight and category terms receive a 2× weight. Results are adapted to NixSearch's existing API response, so the frontend retains its current layout, styling, and interactions. Wikipedia availability and outbound internet access affect this mode.
+With the default `SEARCH_SOURCE=wikipedia`, a search first discovers article titles through the English Wikipedia OpenSearch API. Up to eight articles are fetched in parallel, cleaned of navigation and other page furniture, and ranked using BM25. Title terms receive a 3× weight and category terms receive a 2× weight. Results are adapted to WellSearch's API response and rendered by the Next.js frontend. Wikipedia availability and outbound internet access affect this mode.
 
 With `SEARCH_SOURCE=local`, fetched documents are normalised into an inverted index with weighted title, description, and body frequencies. Stored positions support quoted phrases and proximity boosting. Search retrieves posting lists, applies BM25 and query constraints, then creates plain-text snippets and safe highlights. The crawler extracts title, description, text, links, canonical URLs, and robots directives. Index snapshots use temporary files and atomic rename; startup can rebuild from stored documents if needed.
 

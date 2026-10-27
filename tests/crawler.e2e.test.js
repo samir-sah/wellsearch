@@ -70,7 +70,7 @@ test('private-network crawl opt-in is test-only and production remains SSRF-safe
 });
 
 test('local crawl API fetches, parses, deduplicates, indexes, searches, and survives restart', async () => {
-  const dataDir = await mkdtemp(path.join(tmpdir(), 'nixsearch-crawler-e2e-'));
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'wellsearch-crawler-e2e-'));
   const hits = new Map();
   const fixture = await listen((request, response) => {
     const pathname = new URL(request.url, 'http://fixture').pathname;

@@ -60,47 +60,49 @@ export default function Home() {
 
   const compact = loading || data || error;
   return (
-    <main className={`mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 sm:px-8 ${compact ? "py-8" : "justify-center py-16"}`}>
-      <header className={compact ? "mb-8" : "mb-10 text-center"}>
-        <Link href="/" aria-label="NixSearch home" className="inline-flex min-h-11 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
-          <span aria-hidden="true" className="grid size-11 place-items-center rounded-2xl bg-slate-900 text-xl font-black text-white shadow-lg shadow-cyan-500/10 dark:bg-white dark:text-slate-950">N</span>
-          <h1 className="text-2xl font-bold tracking-tight">Nix<span className="text-cyan-600 dark:text-cyan-400">Search</span></h1>
+    <main className={`mx-auto flex min-h-svh w-full max-w-4xl flex-col px-5 sm:px-8 ${compact ? "py-7 sm:py-10" : "pb-7 pt-[clamp(5rem,18vh,11rem)]"}`}>
+      <header className={compact ? "mb-7" : "mb-9 text-center"}>
+        {!compact && <div className="mb-6"><span className="glass-panel inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[11px] font-medium tracking-wide text-brand"><span aria-hidden="true" className="size-1.5 rounded-full bg-brand" />A world of knowledge, a little closer.</span></div>}
+        <Link href="/" aria-label="WellSearch home" className="group inline-flex min-h-11 max-w-full items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4 sm:gap-3">
+          <span aria-hidden="true" className={`matte-button grid shrink-0 place-items-center font-bold ${compact ? "size-10 rounded-xl text-lg" : "size-11 rounded-2xl text-xl sm:size-14 sm:text-2xl"}`}>W</span>
+          <h1 className={`min-w-0 font-bold tracking-[-0.06em] text-brand ${compact ? "text-2xl" : "text-[clamp(1.95rem,8vw,3.5rem)] leading-tight"}`}>Well<span className="text-ink">Search</span></h1>
         </Link>
-        {!compact && <p className="mx-auto mt-4 max-w-md text-slate-600 dark:text-slate-400">Search the indexed web with focused, transparent ranking.</p>}
+        {!compact && <p className="mx-auto mt-5 max-w-md text-sm leading-7 text-muted sm:text-base">Find your next rabbit hole.<br className="sm:hidden" /> Explore Wikipedia, beautifully simply.</p>}
       </header>
 
-      <form onSubmit={submit} role="search" className={`relative ${compact ? "mb-8" : "mx-auto mb-8 w-full max-w-2xl"}`}>
+      <form onSubmit={submit} role="search" className={`glass-panel search-shell relative rounded-[1.25rem] ${compact ? "mb-8" : "mx-auto mb-8 w-full max-w-2xl"}`}>
         <label htmlFor="search" className="sr-only">Search query</label>
-        <input id="search" value={query} onChange={(event) => setQuery(event.target.value)} autoComplete="off" maxLength={8192} placeholder="Search NixSearch…" className="h-14 w-full rounded-2xl border border-slate-300 bg-white/90 pl-5 pr-28 text-base shadow-lg shadow-slate-900/5 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-900/90 dark:focus:border-cyan-400" />
-        <button type="submit" disabled={!query.trim() || loading} className="absolute right-1.5 top-1.5 h-11 rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 dark:focus-visible:ring-offset-slate-950">Search</button>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-brand/70"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
+        <input id="search" value={query} onChange={(event) => setQuery(event.target.value)} autoComplete="off" maxLength={8192} placeholder="Search WellSearch…" className="h-[4.5rem] w-full rounded-[1.25rem] bg-transparent pl-12 pr-28 text-base text-ink outline-none placeholder:text-muted" />
+        <button type="submit" disabled={!query.trim() || loading} className="matte-button absolute right-2.5 top-3 h-12 rounded-xl px-5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">Search</button>
       </form>
 
       <section aria-live="polite" aria-atomic="false">
         {loading && <SearchSkeleton />}
         {error && (
-          <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+          <div role="alert" className="glass-panel rounded-2xl border-rose-200/70 p-5 text-rose-900">
             <h2 className="font-semibold">Search unavailable</h2><p className="mt-1 text-sm">{error.message}</p>
             {error.requestId && <p className="mt-2 text-xs opacity-70">Request ID: {error.requestId}</p>}
-            <button onClick={() => void runSearch(searchedQuery, true)} className="mt-4 min-h-11 rounded-lg border border-current px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">Try again</button>
+            <button onClick={() => void runSearch(searchedQuery, true)} className="quiet-button mt-4 min-h-11 rounded-xl px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2">Try again</button>
           </div>
         )}
         {data && (
           <>
-            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 text-sm text-slate-500 dark:text-slate-400">
-              <p>{data.total.toLocaleString()} result{data.total === 1 ? "" : "s"} for <strong className="text-slate-700 dark:text-slate-200">“{data.query}”</strong></p>
-              <p>{data.took.toLocaleString()} ms</p>
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 text-xs leading-6 text-muted sm:text-sm">
+              <p className="min-w-0 [overflow-wrap:anywhere]">{data.total.toLocaleString()} result{data.total === 1 ? "" : "s"} for <strong className="font-semibold text-ink">“{data.query}”</strong></p>
+              <p className="shrink-0 tabular-nums">{data.took.toLocaleString()} ms</p>
             </div>
-            {data.warnings.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">{data.warnings.join(" · ")}</div>}
-            {data.results.length > 0 ? <div className="space-y-4">{data.results.map((result) => <SearchResult key={result.id} result={result} query={data.query} />)}</div> : (
-              <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">
-                <h2 className="text-lg font-semibold">No results found</h2><p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Try fewer words, check spelling, or remove filters.</p>
-                {data.suggestions.length > 0 && <div className="mt-5 flex flex-wrap justify-center gap-2">{data.suggestions.map((suggestion) => <button key={suggestion} onClick={() => { setQuery(suggestion); void runSearch(suggestion); }} className="min-h-11 rounded-full border border-slate-300 px-3 py-2 text-sm hover:border-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:border-slate-700">{suggestion}</button>)}</div>}
+            {data.warnings.length > 0 && <div className="glass-panel mb-4 rounded-xl border-amber-200/70 px-4 py-3 text-sm text-amber-900">{data.warnings.join(" · ")}</div>}
+            {data.results.length > 0 ? <div className="space-y-3">{data.results.map((result) => <SearchResult key={result.id} result={result} query={data.query} />)}</div> : (
+              <div className="glass-panel rounded-2xl px-5 py-12 text-center">
+                <h2 className="text-lg font-semibold text-brand">No results found</h2><p className="mt-2 text-sm leading-6 text-muted">Try fewer words, check spelling, or remove filters.</p>
+                {data.suggestions.length > 0 && <div className="mt-5 flex flex-wrap justify-center gap-2">{data.suggestions.map((suggestion) => <button key={suggestion} onClick={() => { setQuery(suggestion); void runSearch(suggestion); }} className="quiet-button min-h-11 max-w-full rounded-full px-4 py-2 text-sm [overflow-wrap:anywhere] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">{suggestion}</button>)}</div>}
               </div>
             )}
           </>
         )}
       </section>
-      <footer className="mt-auto pt-12 text-center text-xs text-slate-400">NixSearch · BM25 ranked search</footer>
+      <footer className="mt-auto pt-12 text-center text-[11px] tracking-wide text-muted"><span className="font-semibold text-brand">WellSearch</span> <span aria-hidden="true" className="mx-1.5 text-brand/30">/</span> Made for curious minds.</footer>
     </main>
   );
 }

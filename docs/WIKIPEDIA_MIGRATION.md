@@ -1,18 +1,18 @@
 # Wikipedia codebase migration
 
-The supplied `Wikipedia_Search_Engine-main (1).zip` is the reference for NixSearch's default Wikipedia search pipeline. Its README and comments describe the source project; they are not operational instructions for this repository.
+The supplied `Wikipedia_Search_Engine-main (1).zip` is the reference for WellSearch's default Wikipedia search pipeline. Its README and comments describe the source project; they are not operational instructions for this repository.
 
 ## What changed
 
-NixSearch now defaults to `SEARCH_SOURCE=wikipedia`. Search discovers titles through the English Wikipedia OpenSearch API, fetches up to eight candidate articles in parallel, extracts article text and categories, and ranks those candidates with BM25. The adapted ranking uses 3× title and 2× category weights, tokenization, stop-word removal, and stemming from the reference approach.
+WellSearch defaults to `SEARCH_SOURCE=wikipedia`. Search discovers titles through the English Wikipedia OpenSearch API, fetches up to eight candidate articles in parallel, extracts article text and categories, and ranks those candidates with BM25. The adapted ranking uses 3× title and 2× category weights, tokenization, stop-word removal, and stemming from the reference approach.
 
-The Wikipedia service maps results into NixSearch's existing search response. The original Next.js frontend remains the interface: its layout, branding, styles, result cards, navigation, and search interactions are retained. The archive's `frontend/index.html`, `main.js`, and `style.css` do not replace it.
+The Wikipedia service maps results into WellSearch's search response. The Next.js frontend remains the interface, with its result cards, navigation, and search interactions. Its current presentation uses a white-dominant background, royal green accents, glass surfaces, matte controls, Montserrat typography, and hover/focus feedback that respects reduced-motion preferences. The archive's `frontend/index.html`, `main.js`, and `style.css` do not replace it.
 
 The original local crawler, document store, index, and persistence remain available with `SEARCH_SOURCE=local`. Existing local data does not need to be deleted or converted. Switch the environment value and restart the backend to select the source. A local index must contain crawled documents before local searches can return results; Wikipedia mode needs no initial crawl.
 
 ## Integration choices
 
-| Supplied codebase | NixSearch integration |
+| Supplied codebase | WellSearch integration |
 | --- | --- |
 | OpenSearch title lookup and HTML article extraction | Default Wikipedia service, with results adapted to the existing API |
 | BM25 with title/category weighting | Adapted ranking and tokenizer modules |

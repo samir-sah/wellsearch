@@ -1,6 +1,8 @@
-# NixSearch architecture
+# WellSearch architecture
 
-NixSearch is split into HTTP composition, application services, and two selectable search sources. `SEARCH_SOURCE=wikipedia` is the default and searches live English Wikipedia content. `SEARCH_SOURCE=local` retains the original crawler and persistent index. Both return the same response shape to the existing Next.js interface.
+WellSearch is split into HTTP composition, application services, and two selectable search sources. `SEARCH_SOURCE=wikipedia` is the default and searches live English Wikipedia content. `SEARCH_SOURCE=local` retains the original crawler and persistent index. Both return the same response shape to the Next.js interface.
+
+The frontend uses Montserrat with a white-dominant palette, royal green accents, translucent glass surfaces, and matte controls. Hover and keyboard-focus feedback keep controls clear, while reduced-motion preferences limit decorative movement. Presentation changes do not alter the search API contract.
 
 ```text
 Frontend

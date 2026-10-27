@@ -29,7 +29,7 @@ export class RobotsCache {
   constructor({ fetcher, config, logger } = {}) {
     this.fetcher = fetcher;
     this.logger = logger;
-    this.userAgent = config?.crawler?.userAgent ?? 'NixSearchBot/1.0';
+    this.userAgent = config?.crawler?.userAgent ?? 'WellSearchBot/1.0';
     this.token = agentToken(this.userAgent);
     this.enabled = config?.crawler?.respectRobots ?? true;
     /** @type {Map<string, Promise<object>>} */
@@ -117,7 +117,7 @@ export class RobotsCache {
   }
 }
 
-/** `NixSearchBot/1.0 (+https://...)` -> `nixsearchbot` */
+/** `WellSearchBot/1.0 (+https://...)` -> `wellsearchbot` */
 export function agentToken(userAgent) {
   const first = String(userAgent).trim().split(/[\s/]+/)[0] ?? '';
   return first.toLowerCase();

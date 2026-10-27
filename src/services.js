@@ -66,7 +66,7 @@ export async function createServices({
       const index = await indexManager.stats();
       return {
         service: {
-          name: 'NixSearch',
+          name: 'WellSearch',
           version: VERSION,
           env: config.env,
           startedAt: new Date(startedAt).toISOString(),

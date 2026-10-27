@@ -37,8 +37,8 @@ beforeEach(() => {
 describe("search page behavior", () => {
   it("exposes a single page heading and an unambiguous home link name", () => {
     render(<Home />);
-    expect(screen.getByRole("heading", { level: 1, name: "NixSearch" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "NixSearch home" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "WellSearch" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "WellSearch home" })).toBeTruthy();
   });
 
   it("submits trimmed input, preserves the query in the URL, and renders safe results", async () => {
@@ -105,12 +105,12 @@ describe("search page behavior", () => {
   });
 
   it("renders generic errors and does not link unsafe result URLs", async () => {
-    searchMock.mockRejectedValueOnce(new SearchApiError("NixSearch is unreachable. Check your connection and try again.", "network"));
+    searchMock.mockRejectedValueOnce(new SearchApiError("WellSearch is unreachable. Check your connection and try again.", "network"));
     render(<Home />);
     fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "needle" } });
     fireEvent.submit(screen.getByRole("search"));
     expect(await screen.findByRole("alert")).toBeTruthy();
-    expect(screen.getByText(/NixSearch is unreachable/)).toBeTruthy();
+    expect(screen.getByText(/WellSearch is unreachable/)).toBeTruthy();
 
     searchMock.mockResolvedValueOnce(resultResponse({ results: [{ ...resultResponse().results[0], url: "javascript:alert(1)" }] }));
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));

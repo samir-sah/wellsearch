@@ -214,7 +214,7 @@ export function buildConfig(env = process.env, { throwOnError = true } = {}) {
       // intentionally test-only: setting it in development or production has
       // no effect, so local fixtures cannot weaken deployed defaults.
       allowPrivateNetwork: isTest && read.bool('ALLOW_PRIVATE_NETWORK', false),
-      userAgent: read.string('USER_AGENT', 'NixSearchBot/1.0 (+https://github.com/nixsearch)'),
+      userAgent: read.string('USER_AGENT', 'WellSearchBot/1.0 (+https://github.com/samir-sah/wellsearch)'),
       maxRedirects: read.int('MAX_REDIRECTS', 5, { min: 0, max: 20 }),
     },
 

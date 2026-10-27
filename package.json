@@ -1,8 +1,12 @@
 {
-  "name": "nixsearch",
+  "name": "wellsearch",
   "version": "1.0.0",
   "private": true,
-  "description": "NixSearch - live Wikipedia search with BM25 ranking and an optional persistent web crawler",
+  "description": "WellSearch - live Wikipedia search with BM25 ranking and an optional persistent web crawler",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samir-sah/wellsearch.git"
+  },
   "type": "module",
   "main": "src/server.js",
   "engines": {

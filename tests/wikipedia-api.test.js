@@ -30,7 +30,7 @@ function stubClient({ suggestions = {}, articles = {}, suggest, fetchArticle } =
 }
 
 async function withHarness(client, run, overrides = {}) {
-  const dataDir = await mkdtemp(path.join(tmpdir(), 'nixsearch-wikipedia-'));
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'wellsearch-wikipedia-'));
   let services;
   let server;
   try {

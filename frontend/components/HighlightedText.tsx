@@ -7,7 +7,7 @@ export function HighlightedText({ text, query }: { text: string; query: string }
   const pattern = new RegExp(`(${words.map(escapeRegExp).join("|")})`, "giu");
   return text.split(pattern).map((part, index) =>
     words.some((word) => word.toLocaleLowerCase() === part.toLocaleLowerCase()) ? (
-      <mark key={`${part}-${index}`} className="rounded bg-cyan-200/70 px-0.5 text-inherit dark:bg-cyan-400/25">
+      <mark key={`${part}-${index}`} className="rounded bg-[#d4ebdb]/85 px-0.5 text-inherit box-decoration-clone">
         {part}
       </mark>
     ) : <Fragment key={`${part}-${index}`}>{part}</Fragment>,

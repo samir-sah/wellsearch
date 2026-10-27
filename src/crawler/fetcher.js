@@ -36,7 +36,7 @@ const RETRYABLE_ERRORS = new Set(['timeout', 'network', 'reset', 'dns']);
 
 export class Fetcher {
   constructor({ config, logger, fetchImpl, lookup } = {}) {
-    this.userAgent = config?.crawler?.userAgent ?? 'NixSearchBot/1.0';
+    this.userAgent = config?.crawler?.userAgent ?? 'WellSearchBot/1.0';
     this.timeoutMs = config?.crawler?.requestTimeout ?? 10_000;
     this.maxBytes = config?.crawler?.maxContentBytes ?? 2 * 1024 * 1024;
     this.maxRedirects = config?.crawler?.maxRedirects ?? 5;

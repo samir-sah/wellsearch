@@ -10,7 +10,7 @@ import { createServices } from '../src/services.js';
 import { silentLogger } from '../src/utils/logger.js';
 
 async function withServer(env, run) {
-  const dataDir = await mkdtemp(path.join(tmpdir(), 'nixsearch-cors-'));
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'wellsearch-cors-'));
   const config = buildConfig({ NODE_ENV: 'test', DATA_DIR: dataDir, PERSIST_INTERVAL_MS: '0', ...env });
   const services = await createServices({ config, logger: silentLogger });
   const server = await new Promise((resolve) => {

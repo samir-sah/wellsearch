@@ -2,7 +2,7 @@
 
 ## Wikipedia_Search_Engine-main
 
-NixSearch adapts Wikipedia discovery, extraction, tokenization, and BM25 ranking code from the user-supplied `Wikipedia_Search_Engine-main (1).zip`. The supplied archive contains the following license, reproduced verbatim:
+WellSearch adapts Wikipedia discovery, extraction, tokenization, and BM25 ranking code from the user-supplied `Wikipedia_Search_Engine-main (1).zip`. The supplied archive contains the following license, reproduced verbatim:
 
 ```text
 MIT License

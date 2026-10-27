@@ -11,7 +11,7 @@ import { createServices } from '../src/services.js';
 import { silentLogger } from '../src/utils/logger.js';
 
 async function createHarness(overrides = {}) {
-  const dataDir = await mkdtemp(path.join(tmpdir(), 'nixsearch-test-'));
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'wellsearch-test-'));
   const config = buildConfig({
     NODE_ENV: 'test',
     SEARCH_SOURCE: 'local',
@@ -75,7 +75,7 @@ test('GET /api/health exposes the live service contract', async () => {
       'index', 'crawler', 'search', 'memory',
     ]);
     assert.equal(body.status, 'ok');
-    assert.equal(body.service, 'NixSearch');
+    assert.equal(body.service, 'WellSearch');
     assert.equal(body.version, '1.0.0');
     assert.equal(body.env, 'test');
     assert.equal(body.index.documents, 0);
@@ -236,7 +236,7 @@ test('unmatched routes and unexpected failures use JSON error contracts', async 
 });
 
 test('startServer binds an ephemeral port and closes supplied resources exactly once', async () => {
-  const dataDir = await mkdtemp(path.join(tmpdir(), 'nixsearch-lifecycle-'));
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'wellsearch-lifecycle-'));
   const config = buildConfig({
     NODE_ENV: 'test', DATA_DIR: dataDir, HOST: '127.0.0.1', PORT: '0', PERSIST_INTERVAL_MS: '0',
   });

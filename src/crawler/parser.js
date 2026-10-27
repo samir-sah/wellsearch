@@ -125,7 +125,7 @@ export function extractMeta(html) {
         result.lang = content.trim().slice(0, 16).toLowerCase();
         break;
       case 'robots':
-      case 'nixsearchbot': {
+      case 'wellsearchbot': {
         const directives = content.toLowerCase();
         if (directives.includes('noindex') || directives.includes('none')) result.noindex = true;
         if (directives.includes('nofollow') || directives.includes('none')) result.nofollow = true;

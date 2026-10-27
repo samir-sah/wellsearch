@@ -1,4 +1,4 @@
-/** Adapt the supplied Wikipedia search pipeline to the existing NixSearch UI contract. */
+/** Adapt the supplied Wikipedia search pipeline to the existing WellSearch UI contract. */
 import { BM25Index } from './bm25.js';
 import { tokenize } from './tokenizer.js';
 import { escapeHtml } from '../utils/text.js';

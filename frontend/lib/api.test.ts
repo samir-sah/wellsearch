@@ -40,7 +40,7 @@ describe("search API client", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
     await expect(search("needle")).rejects.toMatchObject({
       kind: "network",
-      message: "NixSearch is unreachable. Check your connection and try again.",
+      message: "WellSearch is unreachable. Check your connection and try again.",
     });
   });
 
@@ -56,7 +56,7 @@ describe("search API client", () => {
   it("rejects malformed successful JSON instead of rendering it", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ results: "not-an-array" })));
     await expect(search("needle")).rejects.toMatchObject({
-      kind: "malformed", message: "NixSearch returned an unexpected response. Please try again.",
+      kind: "malformed", message: "WellSearch returned an unexpected response. Please try again.",
     });
   });
 });

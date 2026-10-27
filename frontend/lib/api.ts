@@ -92,7 +92,7 @@ export async function search(query: string, signal?: AbortSignal): Promise<Searc
   } catch (error) {
     if (timeout.aborted) throw new SearchApiError("The search took too long. Please try again.", "timeout");
     if (error instanceof DOMException && error.name === "AbortError") throw error;
-    throw new SearchApiError("NixSearch is unreachable. Check your connection and try again.", "network");
+    throw new SearchApiError("WellSearch is unreachable. Check your connection and try again.", "network");
   }
 
   const payload: unknown = await response.json().catch(() => null);
@@ -100,12 +100,12 @@ export async function search(query: string, signal?: AbortSignal): Promise<Searc
     const envelope = isErrorEnvelope(payload) ? payload : undefined;
     const requestId = envelope?.error.requestId;
     if (response.status === 429) throw new SearchApiError("Too many searches. Please wait a moment and retry.", "rate-limit", requestId);
-    if (response.status >= 500) throw new SearchApiError("NixSearch is having trouble right now. Please try again.", "server", requestId);
+    if (response.status >= 500) throw new SearchApiError("WellSearch is having trouble right now. Please try again.", "server", requestId);
     throw new SearchApiError(envelope?.error.message ?? "The search request could not be completed.", "request", requestId);
   }
 
   if (!isSearchResponse(payload)) {
-    throw new SearchApiError("NixSearch returned an unexpected response. Please try again.", "malformed");
+    throw new SearchApiError("WellSearch returned an unexpected response. Please try again.", "malformed");
   }
   return payload;
 }

@@ -27,7 +27,7 @@ export function createHealthRoutes({ services }) {
     response.set('Cache-Control', 'no-store');
     response.json({
       status: 'ok',
-      service: 'NixSearch',
+      service: 'WellSearch',
       version: VERSION,
       env: config.env,
       uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
