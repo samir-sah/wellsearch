@@ -8,6 +8,7 @@ import { createApp } from '../src/app.js';
 import { buildConfig } from '../src/config/config.js';
 import { createServices } from '../src/services.js';
 import { silentLogger } from '../src/utils/logger.js';
+import { WikipediaClient } from '../src/wikipedia/client.js';
 
 function article(title, content = `${title} is an encyclopedia article with detailed information about this subject and its history.`) {
   const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
@@ -27,6 +28,21 @@ function stubClient({ suggestions = {}, articles = {}, suggest, fetchArticle } =
       return fetchArticle ? fetchArticle(title) : (articles[title] ?? null);
     },
   };
+}
+
+function batchPage(title, extra = {}) {
+  const document = article(title);
+  return { ns: 0, title, fullurl: document.url, extract: document.content,
+    categories: [{ ns: 14, title: 'Category:Needlework' }], ...extra };
+}
+
+function batchClient(respond) {
+  const calls = [];
+  const client = new WikipediaClient({ fetcher: { async fetch(url, options) {
+    calls.push({ url: new URL(url), options });
+    return { ok: true, text: JSON.stringify(await respond(calls.length)), contentType: 'application/json' };
+  } } });
+  return { client, calls };
 }
 
 async function withHarness(client, run, overrides = {}) {
@@ -296,5 +312,81 @@ test('overlapping Wikipedia queries use independent corpora and globally stable 
     const repeated = await get('/api/search?q=alpha');
     assert.equal(repeated.body.results[0].id, alpha.body.results[0].id);
     assert.equal(client.calls.fetchArticle.length, 2);
+  });
+});
+
+test('real batch parsing preserves the HTTP frontend contract and reuses retrieval across pagination and filters', async () => {
+  const { client, calls } = batchClient(async () => ({ batchcomplete: true,
+    query: { pages: [batchPage('Needle <theory>'), batchPage('Needle history')] } }));
+  await withHarness(client, async ({ get }) => {
+    const first = await get('/api/search?q=needle&limit=1&explain=true');
+    const second = await get('/api/search?q=NEEDLE&page=2&limit=1');
+    const filtered = await get('/api/search?q=needle&host=example.com');
+    for (const entry of [first, second, filtered]) {
+      assert.equal(entry.response.status, 200);
+      assertFrontendContract(entry.body);
+      assert.deepEqual(entry.body.warnings, []);
+    }
+    assert.equal(first.body.total, 2);
+    assert.equal(first.body.totalPages, 2);
+    assert.equal(first.body.results[0].rank, 1);
+    assert.ok(first.body.results[0].explain.contributions.length > 0);
+    assert.equal(second.body.results[0].rank, 2);
+    assert.notEqual(first.body.results[0].id, second.body.results[0].id);
+    assert.equal(second.body.query, 'NEEDLE');
+    assert.equal(filtered.body.total, 0);
+    assert.equal(filtered.body.diagnostics.documentCount, 2);
+    assert.equal(calls.length, 1, 'a cached corpus must not trigger title lookup or HTML downloads');
+    assert.equal(calls[0].url.origin, 'https://en.wikipedia.org');
+    assert.equal(calls[0].url.pathname, '/w/api.php');
+    assert.equal(calls[0].url.searchParams.get('generator'), 'prefixsearch');
+    assert.equal(calls[0].options.allowedOrigin, 'https://en.wikipedia.org');
+    assert.deepEqual(first.body.results[0].categories, ['Needlework']);
+  });
+});
+
+test('real batch HTTP failures and partial results remain safe and recover on the next search', async () => {
+  const secret = 'private-batch-upstream-token';
+  const { client, calls } = batchClient(async (attempt) => {
+    if (attempt === 1) return { batchcomplete: true, query: { pages: [
+      batchPage('Needle one'), batchPage('Needle two', { extract: undefined }),
+    ] } };
+    if (attempt === 2) return { error: { code: 'upstream-failure', info: secret } };
+    return { batchcomplete: true, query: { pages: [batchPage('Needle one'), batchPage('Needle two')] } };
+  });
+  await withHarness(client, async ({ get }) => {
+    const partial = await get('/api/search?q=needle');
+    assert.equal(partial.response.status, 200);
+    assertFrontendContract(partial.body);
+    assert.equal(partial.body.total, 1);
+    assert.ok(partial.body.warnings.length > 0);
+    const failed = await get('/api/search?q=needle');
+    assert.equal(failed.response.status, 502);
+    assert.equal(failed.body.error.code, 'WIKIPEDIA_UNAVAILABLE');
+    assert.ok(failed.body.error.requestId);
+    assert.ok(!JSON.stringify(failed.body).includes(secret));
+    const recovered = await get('/api/search?q=needle');
+    assert.equal(recovered.response.status, 200);
+    assertFrontendContract(recovered.body);
+    assert.equal(recovered.body.total, 2);
+    assert.deepEqual(recovered.body.warnings, []);
+    const cached = await get('/api/search?q=needle');
+    assert.deepEqual(cached.body.results, recovered.body.results);
+    assert.equal(calls.length, 3);
+  });
+});
+
+test('namespace-prefixed batch queries produce normal no-results responses instead of a false outage', async () => {
+  const { client, calls } = batchClient(async () => ({ batchcomplete: true,
+    query: { pages: [{ ns: 14, title: 'Category:Physics' }] } }));
+  await withHarness(client, async ({ get }) => {
+    const { response, body } = await get('/api/search?q=Category%3APhysics');
+    assert.equal(response.status, 200);
+    assertFrontendContract(body);
+    assert.equal(body.total, 0);
+    assert.equal(body.diagnostics.reason, 'no-wikipedia-articles');
+    assert.deepEqual(body.warnings, []);
+    assert.deepEqual(body.suggestions, []);
+    assert.equal(calls.length, 1);
   });
 });

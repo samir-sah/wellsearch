@@ -11,6 +11,8 @@ export const WIKIPEDIA_ORIGIN = 'https://en.wikipedia.org';
 const ARTICLE_PREFIX = `${WIKIPEDIA_ORIGIN}/wiki/`;
 const CONTENT_LIMIT = 4000;
 const CATEGORY_LIMIT = 20;
+const BATCH_LIMIT = 8;
+const PARTIAL_WARNING = 'Some Wikipedia articles could not be loaded.';
 const REMOVE_SELECTORS = [
   '.infobox', '.navbox', '.reflist', '.references', '.mw-editsection',
   '.hatnote', '.sistersitebox', '.noprint', 'sup.reference', '.toc',
@@ -24,6 +26,84 @@ export class WikipediaClient {
     }
     this.fetcher = fetcher;
     this.timeoutMs = config?.wikipedia?.requestTimeoutMs ?? 3500;
+  }
+
+  async searchArticles(query, limit = BATCH_LIMIT) {
+    const search = String(query ?? '').trim();
+    if (!search) return { articles: [], titles: [], warnings: [] };
+    const maxResults = Number.isFinite(limit) ? Math.max(1, Math.min(BATCH_LIMIT, Math.floor(limit))) : BATCH_LIMIT;
+    const url = new URL('/w/api.php', WIKIPEDIA_ORIGIN);
+    url.search = new URLSearchParams({
+      action: 'query', generator: 'prefixsearch', gpssearch: search, gpsnamespace: '0', gpslimit: String(maxResults),
+      prop: 'extracts|categories|info', exintro: '1', explaintext: '1', exlimit: String(maxResults),
+      clshow: '!hidden', cllimit: '500', inprop: 'url', redirects: '1', format: 'json', formatversion: '2',
+    }).toString();
+    const response = await this.#fetch(url.href);
+    let data;
+    try { data = JSON.parse(response.text); } catch (cause) { throw unavailable(cause); }
+    if (!isRecord(data) || data.error !== undefined || data.errors !== undefined ||
+        (data.warnings !== undefined && !isRecord(data.warnings) && !Array.isArray(data.warnings))) {
+      throw unavailable();
+    }
+    const apiWarning = data.warnings !== undefined && Object.keys(data.warnings).length > 0;
+    if (data.query === undefined && data.batchcomplete === true && !apiWarning) {
+      return { articles: [], titles: [], warnings: [] };
+    }
+    if (!isRecord(data.query) || !Array.isArray(data.query.pages)) throw unavailable();
+
+    // Prefixsearch's page index preserves candidate order despite query.pages being in page-ID order.
+    const pages = data.query.pages.map((page, position) => ({ page, position }))
+      .sort((a, b) => pageOrder(a) - pageOrder(b)).slice(0, maxResults);
+    const articles = [];
+    const titles = [];
+    const seenUrls = new Set();
+    const fetchedAt = new Date().toISOString();
+    let incomplete = apiWarning || (isRecord(data.continue) && data.continue.clcontinue !== undefined);
+    let failed = 0;
+    for (const { page } of pages) {
+      if (isRecord(page) && (Object.hasOwn(page, 'missing') || Object.hasOwn(page, 'invalid'))) continue;
+      if (!isRecord(page) || !Number.isInteger(page.ns) || page.ns < 0 || typeof page.title !== 'string' ||
+          !page.title.trim() || page.title.trim().length > 300) {
+        failed += 1;
+        continue;
+      }
+      // Recognized namespace prefixes override gpsnamespace upstream. These
+      // are valid pages outside our article-only corpus, not an outage.
+      if (page.ns !== 0) continue;
+      const title = cleanText(page.title);
+      if (!titles.includes(title)) titles.push(title);
+      const href = page.canonicalurl ?? page.fullurl;
+      if (typeof href !== 'string') {
+        failed += 1;
+        continue;
+      }
+      const articleUrl = safeArticleUrl(href);
+      if (!articleUrl) throw unavailable();
+      if (typeof page.extract !== 'string') {
+        failed += 1;
+        continue;
+      }
+      const content = cleanText(page.extract).replace(/\[\d+\]/g, '').trim().slice(0, CONTENT_LIMIT);
+      if (content.length < 80 || seenUrls.has(articleUrl)) continue;
+      const categories = [];
+      if (page.categories !== undefined && !Array.isArray(page.categories)) incomplete = true;
+      for (const category of Array.isArray(page.categories) ? page.categories : []) {
+        if (!isRecord(category) || typeof category.title !== 'string' || !category.title.startsWith('Category:')) {
+          incomplete = true;
+          continue;
+        }
+        if (Object.hasOwn(category, 'hidden')) continue;
+        const name = cleanText(category.title.slice('Category:'.length));
+        if (name && name.length <= 160 && !categories.includes(name) && categories.length < CATEGORY_LIMIT) {
+          categories.push(name);
+        }
+      }
+      seenUrls.add(articleUrl);
+      articles.push({ id: articleUrl, title, url: articleUrl, content, categories, fetchedAt });
+    }
+    if (failed && !articles.length) throw unavailable();
+    incomplete ||= failed > 0;
+    return { articles, titles, warnings: incomplete ? [PARTIAL_WARNING] : [] };
   }
 
   async suggest(query, limit = 8) {
@@ -102,6 +182,14 @@ export class WikipediaClient {
 
 function cleanText(value) {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function pageOrder({ page, position }) {
+  return Number.isFinite(page?.index) && page.index >= 0 ? page.index : position;
 }
 
 function safeArticleUrl(value, base = WIKIPEDIA_ORIGIN) {

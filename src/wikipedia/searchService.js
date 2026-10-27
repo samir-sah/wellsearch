@@ -24,6 +24,7 @@ export class WikipediaSearchService {
     this.suggestionCache = new Map();
     this.pending = new Map();
     this.pendingArticles = new Map();
+    this.corpusIndexes = new WeakMap();
   }
 
   async search(raw, { page = 1, limit = this.config.search.defaultLimit, host, explain = false } = {}) {
@@ -42,8 +43,12 @@ export class WikipediaSearchService {
     // A query gets its own corpus. Articles cached by earlier, unrelated searches
     // must not alter its IDF values, ordering, or result set.
     const scoringStart = performance.now();
-    const index = new BM25Index(this.config.bm25);
-    for (const article of corpus.articles) index.addDocument(article);
+    let index = this.corpusIndexes.get(corpus);
+    if (!index) {
+      index = new BM25Index(this.config.bm25);
+      for (const article of corpus.articles) index.addDocument(article);
+      this.corpusIndexes.set(corpus, index);
+    }
     const ranked = index.searchTerms(terms, MAX_ARTICLES_PER_SEARCH);
     const scoring = performance.now() - scoringStart;
     const filteringStart = performance.now();
@@ -126,10 +131,27 @@ export class WikipediaSearchService {
   }
 
   async #corpus(query) {
-    const key = query.toLowerCase();
+    const normalized = query.replace(/\s+/g, ' ').trim();
+    const key = normalized.toLowerCase();
     const cached = this.#cached(this.queryCache, key);
     if (cached) return cached;
     return this.#work(`search:${key}`, async () => {
+      if (typeof this.client.searchArticles === 'function') {
+        let corpus;
+        try {
+          corpus = await this.client.searchArticles(normalized, MAX_ARTICLES_PER_SEARCH);
+          if (!validCorpus(corpus)) throw upstreamUnavailable();
+        } catch { throw upstreamUnavailable(); }
+        // Partial upstream responses are useful now, but should be retried next time.
+        if (corpus.warnings.length === 0) {
+          this.#remember(this.queryCache, key, corpus, Math.min(50, this.config.wikipedia.maxCachedArticles));
+        }
+        for (const article of corpus.articles) {
+          this.#remember(this.articleCache, article.title.replace(/_/g, ' ').trim(), article);
+        }
+        return corpus;
+      }
+      // Compatibility for injected clients and the original HTML extraction path.
       const titles = await this.#suggest(query, 10);
       const downloaded = await Promise.allSettled(titles.slice(0, MAX_ARTICLES_PER_SEARCH).map((title) => this.#article(title)));
       const articles = [...new Map(downloaded
@@ -202,10 +224,32 @@ export class WikipediaSearchService {
     this.articleCache.clear();
     this.queryCache.clear();
     this.suggestionCache.clear();
+    this.corpusIndexes = new WeakMap();
   }
 }
 
 export default WikipediaSearchService;
+
+function validCorpus(value) {
+  return value !== null && typeof value === 'object' &&
+    Array.isArray(value.articles) && value.articles.length <= MAX_ARTICLES_PER_SEARCH &&
+    value.articles.every((article) => {
+      if (!article || typeof article !== 'object' || typeof article.id !== 'string' ||
+          typeof article.title !== 'string' || !article.title.trim() || article.title.length > 300 ||
+          typeof article.content !== 'string' || article.content.length < 80 || article.content.length > 4000 ||
+          typeof article.url !== 'string' || !Array.isArray(article.categories) || article.categories.length > 20 ||
+          !article.categories.every((category) => typeof category === 'string' && category.length > 0 && category.length <= 160) ||
+          (article.fetchedAt !== undefined && typeof article.fetchedAt !== 'string')) return false;
+      try {
+        const url = new URL(article.url);
+        return url.origin === 'https://en.wikipedia.org' && !url.username && !url.password &&
+          url.pathname.startsWith('/wiki/') && url.pathname.length > '/wiki/'.length;
+      } catch { return false; }
+    }) &&
+    Array.isArray(value.titles) && value.titles.length <= 50 &&
+    value.titles.every((title) => typeof title === 'string' && title.trim().length > 0 && title.length <= 300) &&
+    Array.isArray(value.warnings) && value.warnings.every((warning) => typeof warning === 'string');
+}
 
 function explainScore(index, id, terms) {
   const lengthPenalty = 1 - index.b + index.b * (index.documentLengths.get(id) / (index.avgdl || 1));

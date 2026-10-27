@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { search } from "./api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+let search: typeof import("./api").search;
 
 const validResponse = {
   query: "needle & thread",
@@ -24,7 +25,15 @@ function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(async () => {
+  vi.resetModules();
+  ({ search } = await import("./api"));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 describe("search API client", () => {
   it("URL-encodes the query and accepts the backend contract", async () => {
@@ -58,5 +67,104 @@ describe("search API client", () => {
     await expect(search("needle")).rejects.toMatchObject({
       kind: "malformed", message: "WellSearch returned an unexpected response. Please try again.",
     });
+  });
+
+  it("returns a completed repeat search immediately without another request", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => response(validResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(search("needle & thread")).resolves.toEqual(validResponse);
+    await expect(search("  needle & thread  ")).resolves.toEqual(validResponse);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("fetches fresh results after the completed search expires", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-27T00:00:00Z"));
+    const fetchMock = vi.fn().mockImplementation(async () => response(validResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await search("needle & thread");
+    vi.setSystemTime(new Date("2026-10-27T00:00:29.999Z"));
+    await search("needle & thread");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    vi.setSystemTime(new Date("2026-10-27T00:00:30Z"));
+    await search("needle & thread");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("bounds memory by evicting the least recently used of 30 searches", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => response(validResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    for (let index = 0; index < 30; index += 1) await search(`topic ${index}`);
+    await search("topic 0");
+    expect(fetchMock).toHaveBeenCalledTimes(30);
+    await search("topic 30");
+    await search("topic 0");
+    expect(fetchMock).toHaveBeenCalledTimes(31);
+    await search("topic 1");
+    expect(fetchMock).toHaveBeenCalledTimes(32);
+  });
+
+  it.each([
+    { name: "rate limits", status: 429, body: { error: { code: "RATE_LIMITED", message: "retry" } }, kind: "rate-limit" },
+    { name: "server failures", status: 503, body: {}, kind: "server" },
+    { name: "invalid JSON contracts", status: 200, body: { results: "invalid" }, kind: "malformed" },
+  ])("never caches $name", async ({ status, body, kind }) => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response(body, status))
+      .mockResolvedValueOnce(response(validResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(search("needle & thread")).rejects.toMatchObject({ kind });
+    await expect(search("needle & thread")).resolves.toEqual(validResponse);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("honors caller cancellation even when results are already cached", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => response(validResponse));
+    vi.stubGlobal("fetch", fetchMock);
+    await search("needle & thread");
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(search("needle & thread", controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("shows partial results but retries immediately after an upstream warning", async () => {
+    const partialResponse = {
+      ...validResponse,
+      warnings: ["1 Wikipedia article(s) could not be downloaded; showing available results."],
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response(partialResponse))
+      .mockResolvedValueOnce(response(validResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(search("needle & thread")).resolves.toEqual(partialResponse);
+    await expect(search("needle & thread")).resolves.toEqual(validResponse);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(search("needle & thread")).resolves.toEqual(validResponse);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not cache a response whose caller cancels during body parsing", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => {
+          controller.abort();
+          return validResponse;
+        },
+      })
+      .mockResolvedValueOnce(response(validResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(search("needle & thread", controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    await expect(search("needle & thread")).resolves.toEqual(validResponse);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

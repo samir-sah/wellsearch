@@ -9,7 +9,7 @@ export function SearchResult({ result, query }: { result: Result; query: string 
         <span className="grid size-7 shrink-0 place-items-center rounded-lg border border-brand-line bg-brand-soft/90 font-semibold text-brand shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">{result.rank}</span>
         <span className="truncate">{result.displayUrl}</span>
       </div>
-      <h2 className="break-words text-lg font-semibold leading-snug text-brand [overflow-wrap:anywhere]">
+      <h2 className="break-words text-lg font-bold leading-snug tracking-[-0.025em] text-brand [overflow-wrap:anywhere]">
         {href ? (
           <a className="rounded-sm decoration-brand/50 decoration-2 underline-offset-4 transition-colors hover:text-[#003e20] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2" href={href} target="_blank" rel="noopener noreferrer">
             <HighlightedText text={result.title} query={query} />

@@ -15,11 +15,11 @@ Controllers
     ↓
 Services
     ├── Selected search service
-    │      ├── Wikipedia OpenSearch title discovery
+    │      ├── MediaWiki prefixsearch + extracts/categories/URLs (one request)
     │      │      ↓
-    │      │   Secured article fetch → Cheerio extraction → weighted BM25
+    │      │   Secured JSON fetch → plain-text lead extracts → weighted BM25
     │      │      ↕
-    │      │   Bounded TTL query/article caches
+    │      │   Bounded TTL query/article caches + query-specific BM25 indexes
     │      │
     │      └── Local search engine
     │      ↓
@@ -50,13 +50,21 @@ The API listens on port 3000 by default. The Next.js frontend runs independently
 
 ## Wikipedia search
 
-The Wikipedia service adapts the supplied codebase's OpenSearch discovery, article extraction, tokenization, and BM25 ranking into the existing search contract. It discovers titles, loads up to eight articles in parallel, extracts useful article text and categories with Cheerio, and computes BM25 using a 3× title weight and a 2× category weight. Article URLs provide stable result identities. Existing result cards consume plain-text fields and safe highlight data rather than rendering upstream HTML.
+The Wikipedia service adapts the supplied codebase's tokenization and BM25 ranking into the existing search contract. Its default client performs one MediaWiki `action=query` request with `generator=prefixsearch` and `prop=extracts|categories|info`. This returns up to eight candidates with introductory plain-text extracts (`exintro` and `explaintext`), canonical URLs, and visible categories. The client validates the response and retains up to 4,000 characters and 20 categories per article. BM25 uses a 3× title weight and a 2× category weight. Article URLs provide stable result identities. Existing result cards consume plain-text fields and safe highlight data rather than rendering upstream HTML.
 
-Query and article caches have a configurable TTL and bounded storage. Concurrent search work is capped. The relevant settings are `WIKIPEDIA_REQUEST_TIMEOUT_MS`, `WIKIPEDIA_CACHE_TTL_MS`, `WIKIPEDIA_MAX_CACHED_ARTICLES`, and `WIKIPEDIA_MAX_CONCURRENT_SEARCHES`. These caches are process memory, not persistent snapshots or a complete Wikipedia index. The service requires outbound network access and is subject to upstream availability.
+The lead-extract path replaces a sequential OpenSearch lookup followed by up to eight full HTML downloads and Cheerio parsing. Prefix-search discovery and lead text can differ from the earlier candidate set and first 4,000 characters of cleaned HTML paragraphs, so scores and result order need not match. It does not rank complete article bodies. `suggest` and `fetchArticle` remain available for legacy injected clients; a client without `searchArticles` uses the earlier extraction path. Production JSON failures return the normal upstream error instead of triggering an automatic HTML retry.
+
+Query and article caches have a configurable TTL and bounded storage. Server query keys normalize whitespace and case, and simultaneous requests for the same key share retrieval work. Each cached corpus has its own reusable BM25 index, so unrelated searches cannot change its document frequencies or ranking. Query storage is capped at the smaller of 50 entries and `WIKIPEDIA_MAX_CACHED_ARTICLES`; article storage uses that configured article limit. Responses with upstream warnings are returned but their query corpora are not cached, allowing the next search to retry. Concurrent search work is capped. The relevant settings are `WIKIPEDIA_REQUEST_TIMEOUT_MS`, `WIKIPEDIA_CACHE_TTL_MS`, `WIKIPEDIA_MAX_CACHED_ARTICLES`, and `WIKIPEDIA_MAX_CONCURRENT_SEARCHES`. These caches are process memory, not persistent snapshots or a complete Wikipedia index. The service requires outbound network access and is subject to upstream availability.
+
+The frontend API client has a separate in-memory cache of up to 30 completed responses with a 30-second TTL, keyed by the trimmed query. It caches only validated successful responses without warnings. Errors, aborted requests, and partial upstream responses are retried rather than retained. This cache is distinct from HTTP caching; uncached browser requests still use `cache: "no-store"`.
+
+The result header measures elapsed response time in the browser, including cache lookup, rather than showing a cached response's original server duration. Backend `took` and `timings` remain unchanged; the original server duration is available in the timing tooltip.
 
 `GET /api/suggest?q=...` exposes suggestions in a consistent `{ prefix, suggestions }` object. The default source obtains them from Wikipedia OpenSearch. `GET /api/search` uses the source selected when the backend starts; no frontend redesign or initial local crawl is necessary.
 
 Phrase, exclusion, and inline `site:` query parsing remain features of the local engine. Wikipedia title discovery uses the input as a search string; the explicit `site`/`host` parameter can filter its article URLs. Startup readiness does not probe Wikipedia or certify upstream network availability.
+
+Wikipedia search only ranks mainspace articles. Recognized namespace-prefixed queries can override MediaWiki's namespace parameter, so valid category, help, or talk pages are skipped rather than reported as upstream failures. See the [prefix-search namespace behavior](https://www.mediawiki.org/wiki/API:Prefixsearch).
 
 ## Local search and index
 

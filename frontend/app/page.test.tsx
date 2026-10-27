@@ -78,6 +78,23 @@ describe("search page behavior", () => {
     await waitFor(() => expect(resultSummaryQuery()).toBe("second"));
   });
 
+  it("shows current response time instead of a cached response's original server duration", async () => {
+    let clock = 1_000;
+    const timer = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    searchMock.mockImplementation(async () => {
+      clock += 7.25;
+      return resultResponse({ took: 999 });
+    });
+    try {
+      render(<Home />);
+      fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "needle" } });
+      fireEvent.submit(screen.getByRole("search"));
+      const timing = await screen.findByLabelText("Search response time");
+      expect(timing.textContent).toBe("7.25 ms");
+      expect(timing.title).toBe("Server processing: 999 ms");
+    } finally { timer.mockRestore(); }
+  });
+
   it("restores a bookmarked query and searches without rewriting history", async () => {
     window.history.replaceState(null, "", "/?q=saved%20query");
     searchMock.mockResolvedValue(resultResponse({ query: "saved query" }));

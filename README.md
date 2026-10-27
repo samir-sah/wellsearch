@@ -6,8 +6,8 @@ Source repository: [samir-sah/wellsearch](https://github.com/samir-sah/wellsearc
 
 ## Features
 
-- Live Wikipedia article discovery with OpenSearch suggestions, parallel article extraction, and title/category-weighted BM25 ranking.
-- Bounded, expiring in-memory caches for Wikipedia queries and articles; no initial crawl is needed for the default search mode.
+- Live Wikipedia article discovery, lead extracts, canonical URLs, and categories in one batched MediaWiki request, followed by title/category-weighted BM25 ranking. Autocomplete uses OpenSearch.
+- Bounded, expiring server caches reuse query-specific corpora and BM25 indexes; a short browser response cache makes repeat searches immediate. No initial crawl is needed for the default search mode.
 - An optional local search mode with concurrent, polite web crawling, URL canonicalisation, robots.txt support, per-host limits, and retry handling.
 - SSRF-resistant fetching: local, private, link-local, metadata, mapped IPv4, and special IPv6 destinations are blocked; redirects are revalidated and sockets are pinned to validated DNS answers.
 - Stemming, stop-word handling, snippets, highlighting, and pagination; the local index also supports quoted phrases, exclusions, and host filters.
@@ -20,7 +20,7 @@ Source repository: [samir-sah/wellsearch](https://github.com/samir-sah/wellsearc
 
 ```text
 Next.js frontend -> REST API -> middleware -> controllers -> selected search service
-                                                        -> Wikipedia OpenSearch -> articles -> BM25
+                                                        -> MediaWiki prefixsearch + extracts/categories/URLs -> BM25
                                                         -> local search engine -> persisted index -> BM25
 
 Crawler -> URL queue -> pinned fetcher -> parser -> index manager
@@ -31,12 +31,14 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and [docs/WIKIPE
 ## Tech stack
 
 - Node.js 18.17+ and Express 4
-- Native Node HTTP(S), filesystem, DNS, test runner, and Web APIs; Cheerio for Wikipedia HTML extraction
+- Native Node HTTP(S), filesystem, DNS, test runner, and Web APIs; Cheerio for crawler and legacy Wikipedia HTML extraction
 - Next.js, React, TypeScript, Tailwind CSS, Vitest, and Testing Library
 
 ## How search works
 
-With the default `SEARCH_SOURCE=wikipedia`, a search first discovers article titles through the English Wikipedia OpenSearch API. Up to eight articles are fetched in parallel, cleaned of navigation and other page furniture, and ranked using BM25. Title terms receive a 3× weight and category terms receive a 2× weight. Results are adapted to WellSearch's API response and rendered by the Next.js frontend. Wikipedia availability and outbound internet access affect this mode.
+With the default `SEARCH_SOURCE=wikipedia`, one MediaWiki `action=query` request uses the `prefixsearch` generator to retrieve up to eight English Wikipedia candidates with plain-text introductory extracts, canonical URLs, and visible categories. WellSearch retains up to 4,000 characters and 20 categories per article, then ranks the candidates using BM25. Title terms receive a 3× weight and category terms receive a 2× weight. Autocomplete continues to use OpenSearch. Results are adapted to WellSearch's API response and rendered by the Next.js frontend. Wikipedia availability and outbound internet access affect this mode.
+
+This faster path ranks introductory extracts rather than the previous first 4,000 characters of cleaned HTML paragraphs. Candidate discovery, article text, scores, and ordering can differ from the earlier pipeline; it is not full-article ranking.
 
 With `SEARCH_SOURCE=local`, fetched documents are normalised into an inverted index with weighted title, description, and body frequencies. Stored positions support quoted phrases and proximity boosting. Search retrieves posting lists, applies BM25 and query constraints, then creates plain-text snippets and safe highlights. The crawler extracts title, description, text, links, canonical URLs, and robots directives. Index snapshots use temporary files and atomic rename; startup can rebuild from stored documents if needed.
 
@@ -114,7 +116,7 @@ Copy [`.env.example`](.env.example) and adjust only what the deployment needs. I
 
 `CORS_ORIGINS` accepts exact comma-separated origins only. In production crawl writes are disabled by default; enabling them requires an `ADMIN_TOKEN` of at least 32 characters. `ALLOW_PRIVATE_NETWORK` is honoured only in test mode, never in development or production.
 
-Set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` (or the frontend build environment) to the backend's public URL, without a trailing slash. Add the frontend's exact origin to backend `CORS_ORIGINS`. Wikipedia caches live only in the backend process and expire or disappear on restart; `DATA_DIR` stores the optional local index, not a permanent Wikipedia mirror.
+Set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` (or the frontend build environment) to the backend's public URL, without a trailing slash. Add the frontend's exact origin to backend `CORS_ORIGINS`. Server Wikipedia caches expire or disappear on restart; `DATA_DIR` stores the optional local index, not a permanent Wikipedia mirror. The frontend separately retains up to 30 successful search responses for 30 seconds in memory, excluding errors, aborted requests, and responses with warnings.
 
 ## Testing and quality checks
 
@@ -147,12 +149,12 @@ Probe `/api/health/live` for liveness and `/api/health/ready` for startup readin
 
 ## Performance
 
-Local-index search uses posting lists. Wikipedia search includes upstream discovery and article downloads, with faster repeat requests when caches are warm. The API returns measured request timing in `took` and `timings`; crawl summaries return throughput and persistence statistics. These figures vary by corpus, disk, network, and host. The existing local-index baseline and method are recorded in `docs/PERFORMANCE.md`; they do not establish Wikipedia latency.
+Local-index search uses posting lists. A cold Wikipedia search uses one batched upstream request; warm searches reuse the cached corpus and its BM25 index. Server cache keys normalize whitespace and case, while each query retains its own ranking corpus. The API returns measured request timing in `took` and `timings`; crawl summaries return throughput and persistence statistics. In a three-query live sample on October 28, 2026, average cold HTTP latency fell from 2.20 seconds to 0.70 seconds, about 68% lower. These sequential network measurements are indicative, not a latency guarantee. The method, results, and separate local-index baseline are recorded in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## Limitations and future work
 
 - Persistence is a local JSON snapshot, suitable for a single instance rather than distributed indexing.
-- Wikipedia search covers English Wikipedia candidates returned by OpenSearch, not the whole web or the entire Wikipedia corpus in one ranking pass. Upstream outages, page markup changes, and rate limits can affect results.
+- Wikipedia search ranks lead extracts from up to eight English Wikipedia prefix-search candidates, not the whole web or the entire Wikipedia corpus in one ranking pass. Relevant body-only terms can be missed. Upstream outages, API changes, and rate limits can affect results.
 - Crawling is intentionally conservative and does not execute JavaScript-rendered pages.
 - The crawler has no sitemap ingestion, recrawl scheduler, or distributed queue.
 - Ranking is lexical BM25; it does not use semantic/vector retrieval or personalised ranking.

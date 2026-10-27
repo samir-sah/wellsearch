@@ -7,7 +7,7 @@
   --brand-soft: #e6f1e9;
   --brand-line: #c8dfcf;
   --ink: #18392e;
-  --muted: #65776d;
+  --muted: #5a6c61;
   --line: #e3e9e5;
 }
 
@@ -33,6 +33,7 @@ body {
     linear-gradient(145deg, #f4faf5 0%, #ffffff 44%, #f0f7f2 100%);
   background-attachment: fixed;
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
 }
 button, input { font-family: inherit; }
@@ -63,15 +64,52 @@ button, a { -webkit-tap-highlight-color: transparent; }
   transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
 }
 
-.matte-button {
-  border: 1px solid rgb(0 59 26 / 0.65);
-  background: linear-gradient(165deg, #176b3c, var(--brand) 70%);
+.glass-action {
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  background: linear-gradient(155deg, rgb(12 101 66 / 0.96), rgb(0 67 39 / 0.98) 80%);
   color: #fff;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 2px 4px rgb(1 85 41 / 0.14);
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.45), inset 0 -1px 1px rgb(0 40 20 / 0.2), 0 5px 12px rgb(1 85 41 / 0.2);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
   transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
 
-.matte-button:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+.glass-action::before {
+  position: absolute;
+  inset: 1px 1px 48%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.015));
+  content: "";
+  pointer-events: none;
+}
+
+.glass-action::after {
+  position: absolute;
+  inset: -50% -20%;
+  transform: translateX(-130%) rotate(20deg);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.04), transparent);
+  transition: transform 450ms ease;
+  content: "";
+  pointer-events: none;
+}
+
+.glass-action:disabled {
+  cursor: not-allowed;
+  color: rgb(255 255 255 / 0.88);
+  background: linear-gradient(155deg, rgb(49 119 88 / 0.8), rgb(20 86 58 / 0.88));
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.4), 0 2px 6px rgb(1 85 41 / 0.12);
+}
+
+.glass-action:active:not(:disabled) { transform: translateY(0) scale(0.97); }
+
+.brand-mark {
+  filter: drop-shadow(0 4px 5px rgb(1 85 41 / 0.17));
+  transition: transform 220ms ease, filter 220ms ease;
+}
+
+.brand-wordmark { text-shadow: 0 1px 0 rgb(255 255 255 / 0.7); }
 
 .quiet-button {
   border: 1px solid var(--brand-line);
@@ -88,11 +126,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
     box-shadow: 0 12px 28px -12px rgb(1 85 41 / 0.18), inset 0 1px 0 #fff;
   }
   .search-shell:hover { border-color: rgb(75 140 94 / 0.65); }
-  .matte-button:hover:not(:disabled) {
+  .glass-action:hover:not(:disabled) {
     transform: translateY(-1px);
-    filter: brightness(1.07);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.24), 0 5px 12px rgb(1 85 41 / 0.2);
+    filter: brightness(1.01);
+    box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.55), inset 0 -1px 1px rgb(0 40 20 / 0.2), 0 7px 18px rgb(1 85 41 / 0.25);
   }
+  .glass-action:hover:not(:disabled)::after { transform: translateX(130%) rotate(20deg); }
+  .brand-link:hover .brand-mark { transform: translateY(-1px) rotate(-3deg); filter: drop-shadow(0 6px 8px rgb(1 85 41 / 0.22)); }
   .quiet-button:hover {
     border-color: rgb(73 139 93 / 0.55);
     background: var(--brand-soft);
@@ -102,5 +142,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-  .interactive-surface:hover, .matte-button:hover:not(:disabled), .matte-button:active:not(:disabled) { transform: none; }
+  .interactive-surface:hover, .glass-action:hover:not(:disabled), .glass-action:active:not(:disabled), .brand-link:hover .brand-mark { transform: none; }
+  .glass-action::after { display: none; }
 }

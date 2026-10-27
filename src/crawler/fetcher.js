@@ -76,8 +76,8 @@ export class Fetcher {
           durationMs: round(performance.now() - startedAt),
         };
       }
-      // Wikipedia has two sequential stages, so its timeout bounds the whole
-      // redirect chain rather than starting a fresh budget on every hop.
+      // Source-specific requests have one deadline for the whole redirect
+      // chain rather than starting a fresh budget on every hop.
       const remaining = allowedOrigin ? timeoutMs - (performance.now() - startedAt) : timeoutMs;
       if (remaining <= 0) return {
         ok: false, url: current, requestedUrl: url, status: 0,

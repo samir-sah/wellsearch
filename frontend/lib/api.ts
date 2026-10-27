@@ -75,14 +75,27 @@ export class SearchApiError extends Error {
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 10_000;
+const SEARCH_CACHE_TTL_MS = 30_000;
+const SEARCH_CACHE_LIMIT = 30;
+const completedSearches = new Map<string, { response: SearchResponse; expiresAt: number }>();
 
 export async function search(query: string, signal?: AbortSignal): Promise<SearchResponse> {
+  throwIfAborted(signal);
+  const cacheKey = query.trim();
+  const cached = completedSearches.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    completedSearches.delete(cacheKey);
+    completedSearches.set(cacheKey, cached);
+    return cached.response;
+  }
+  completedSearches.delete(cacheKey);
+
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const combinedSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   let response: Response;
 
   try {
-    const params = new URLSearchParams({ q: query });
+    const params = new URLSearchParams({ q: cacheKey });
     response = await fetch(`${API_URL}/api/search?${params}`, {
       method: "GET",
       headers: { Accept: "application/json" },
@@ -96,6 +109,8 @@ export async function search(query: string, signal?: AbortSignal): Promise<Searc
   }
 
   const payload: unknown = await response.json().catch(() => null);
+  throwIfAborted(signal);
+  if (timeout.aborted) throw new SearchApiError("The search took too long. Please try again.", "timeout");
   if (!response.ok) {
     const envelope = isErrorEnvelope(payload) ? payload : undefined;
     const requestId = envelope?.error.requestId;
@@ -107,7 +122,19 @@ export async function search(query: string, signal?: AbortSignal): Promise<Searc
   if (!isSearchResponse(payload)) {
     throw new SearchApiError("WellSearch returned an unexpected response. Please try again.", "malformed");
   }
+  // Partial upstream failures should recover on the next search, not linger in cache.
+  if (payload.warnings.length === 0) {
+    completedSearches.set(cacheKey, { response: payload, expiresAt: Date.now() + SEARCH_CACHE_TTL_MS });
+    if (completedSearches.size > SEARCH_CACHE_LIMIT) {
+      const oldestKey = completedSearches.keys().next().value;
+      if (oldestKey !== undefined) completedSearches.delete(oldestKey);
+    }
+  }
   return payload;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException("The search was aborted.", "AbortError");
 }
 
 function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
